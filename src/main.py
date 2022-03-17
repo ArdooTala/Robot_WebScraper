@@ -1,8 +1,7 @@
 import unicodedata
-
-from src import ABB_Parser
-from src import Kuka_Parser
-from src.kukaparser import KukaParser
+import ABB_Parser
+import Kuka_Scraper
+from kukaparser import KukaParser
 import pathlib
 from bs4 import BeautifulSoup
 
@@ -24,10 +23,10 @@ if __name__ == '__main__':
         "https://www.kuka.com/en-ca/products/robotics-systems/industrial-robots/kr-600-fortec"
     ]
 
-    save_path = pathlib.Path('KUKA_Lib')
+    save_path = pathlib.Path('../KUKA_Lib')
 
     for link in links:
-        category, models = Kuka_Parser.data_from_url(link)
+        category, models = Kuka_Scraper.data_from_url(link)
 
         robots = []
         print(link)
@@ -51,12 +50,12 @@ if __name__ == '__main__':
             print(rob)
             rob.save_to_disk(save_path / rob.category / rob.model)
 
-        Kuka_Parser.save_csv(save_path / category, robots)
+        Kuka_Scraper.save_csv(save_path / category, robots)
 
     exit(0)
     print("This should not happen")
 
-    path = pathlib.Path("./")
+    path = pathlib.Path("../")
     with open("KUKA.csv", 'w') as kuk:
         for f in path.glob("KR*.csv"):
             with open(f, 'r') as k:
