@@ -1,7 +1,10 @@
-import ABB_Parser
-import Kuka_Parser
+import unicodedata
+
+from src import ABB_Parser
+from src import Kuka_Parser
 from src.kukaparser import KukaParser
 import pathlib
+from bs4 import BeautifulSoup
 
 
 if __name__ == '__main__':
@@ -18,15 +21,40 @@ if __name__ == '__main__':
         "https://www.kuka.com/en-ca/products/robotics-systems/industrial-robots/kr-quantec-press",
         "https://www.kuka.com/en-ca/products/robotics-systems/industrial-robots/kr-360-fortec",
         "https://www.kuka.com/en-ca/products/robotics-systems/industrial-robots/kr-500-fortec",
-        "https://www.kuka.com/en-ca/products/robotics-systems/industrial-robots/kr-600-fortec",
-        "https://www.kuka.com/en-ca/products/robotics-systems/industrial-robots/kr-1000-titan"
+        "https://www.kuka.com/en-ca/products/robotics-systems/industrial-robots/kr-600-fortec"
     ]
 
-    for link in links:
-        print(link)
-        Kuka_Parser.data_from_url(link)
+    save_path = pathlib.Path('KUKA_Lib')
 
-        exit(0)
+    for link in links:
+        category, models = Kuka_Parser.data_from_url(link)
+
+        robots = []
+        print(link)
+        print("HTML data".center(100, '='))
+        print(models[0])
+        for model in models[1:]:
+            print('-'*100)
+            print(model)
+            rob = KukaParser(category, model[0])
+            rob.payload = unicodedata.normalize("NFKD", model[1])
+            rob.reach = unicodedata.normalize("NFKD", model[2])
+            rob.construction = model[3]
+            rob.mount = model[5].split(',')
+            rob.datasheet_url = model[-2].get('href')
+
+            rob.download_pdf()
+            rob.parse_kuka_datasheet()
+
+            robots.append(rob)
+
+            print(rob)
+            rob.save_to_disk(save_path / rob.category / rob.model)
+
+        Kuka_Parser.save_csv(save_path / category, robots)
+
+    exit(0)
+    print("This should not happen")
 
     path = pathlib.Path("./")
     with open("KUKA.csv", 'w') as kuk:

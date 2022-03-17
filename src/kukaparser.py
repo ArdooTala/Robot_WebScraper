@@ -8,19 +8,19 @@ import re
 
 
 class KukaParser:
-    def __init__(self, _url, pdf=None):
-        self.url = _url
+    def __init__(self, cat, model, pdf=None):
+        # self.url = _url
 
         self.manufacturer = 'KUKA'
-        self.category = 'Generic'
-        self.model = 'Unknown'
+        self.category = cat
+        self.model = model
+        self.payload = 0
         self.weight = 0
         self.footprint = (0, 0)
-        self.payload = 0
         self.payload_max = 0
         self.reach = 0
         self.construction = None
-        self.mount = None
+        self.mount = []
 
         self.html_data = None
 
@@ -30,15 +30,10 @@ class KukaParser:
         if pdf:
             self.datasheet = pdf
 
-    def retrieve_html(self):
-        session = HTMLSession()
-        cat = session.get(self.url)
-        cat.html.render()
-        self.html_data = cat.text
-
     def download_pdf(self):
         if not self.datasheet_url:
             return
+        print("Downloading > {}".format(self.datasheet_url))
         session = HTMLSession()
         cat = session.get(self.datasheet_url).content
 
@@ -46,48 +41,46 @@ class KukaParser:
         self._datasheetdata = cat
 
     def parse_kuka_datasheet(self):
-        with pdfplumber.open(self.datasheet) as temp:
-            _page = temp.pages[0]
-            ds = _page.extract_text().strip()
-            model = ds.splitlines()[0]
-            w = re.search(r"Weight approx. (\d+) kg", ds, flags=re.M | re.S | re.IGNORECASE)
-            f = re.search(r"Footprint (\d+) mm x (\d+) mm", ds, flags=re.M | re.S | re.IGNORECASE)
-            m = re.search(r"Maximum payload (\d+\.?\d*) kg", ds, flags=re.M | re.S | re.IGNORECASE)
+        try:
+            with pdfplumber.open(self.datasheet) as temp:
+                _page = temp.pages[0]
+                ds = _page.extract_text().strip()
+                model = ds.splitlines()[0]
+                w = re.search(r"Weight approx. (\d+) kg", ds, flags=re.M | re.S | re.IGNORECASE)
+                f = re.search(r"Footprint (\d+) mm x (\d+) mm", ds, flags=re.M | re.S | re.IGNORECASE)
+                m = re.search(r"Maximum payload (\d+\.?\d*) kg", ds, flags=re.M | re.S | re.IGNORECASE)
 
-            return model, w.groups()[0], f.groups(), m.groups()[0]
+                self.model = model
+                self.weight = float(w.groups()[0])
+                self.footprint = f.groups()
+                self.footprint = (float(self.footprint[0]), float(self.footprint[1]))
+                self.payload_max = float(m.groups()[0])
+        except:
+            print("Could not read pdf file . . .")
+            return None
+        return model, w.groups()[0], f.groups(), m.groups()[0]
 
-    def save_to_disk(self):
-        with open("DL/{}.pdf".format(self.model), 'wb') as file:
-            file.write(self.datasheet)
+    def save_to_disk(self, path: pathlib.Path):
+        if not path.exists():
+            path.mkdir(exist_ok=True, parents=True)
 
-        with open("KUKA_Lib/DL/{}.html".format(self.model), 'w') as f:
-            f.write(self.html_data)
+        with open(path / "{}.pdf".format(self.model), 'wb') as file:
+            file.write(self._datasheetdata)
 
-    def parse_html(self, _html):
-        cat_soup = BeautifulSoup(_html, 'html.parser')
-        title = cat_soup.find('title').contents[0]
-        kk = cat_soup.find_all('table')
-        kh = kk[0].find('thead')
-        kb = kk[0].find('tbody')
+        # with open(path / "{}.html".format(self.model), 'w') as f:
+        #     f.write(self.html_data)
 
-        models = [m.find('strong').contents for m in kh.find_all('th')]
-
-        # cols = kb.find_all('tr')
-        for col in kb.find_all('tr'):
-            spec = [val.find('div').contents for val in col.find_all('td')]
-            models = [m + s for m, s in zip(models, spec)]
-
-        models[0] += ['Weight', 'Footprint', 'Max Payload']
-
-        return title, models
-
-    def save_csv(self, title, models):
-        with open("{}.csv".format(title), 'w') as file:
-            for m in models[1:]:
-                file.write("{},{},{},{},{},{},{},KUKA\n".format(
-                    *re.search(r"(KR \d*) (\w.*)", m[0]).groups(),
-                    float(re.search(r"(\d+\.?\d*)\xa0.*", m[2]).group(1)) / 1000,
-                    float(re.search(r"(\d+\.?\d*)\xa0.*", m[1]).group(1)),
-                    float(m[-4]),
-                    float(m[-3]),
-                    float(m[-2])))
+    def __repr__(self):
+        desc = '''
+        KUKA [{}]
+        {}
+            > payload:  {}
+            >   reach:  {}
+            >  weight:  {}
+        \n\n'''.format(
+            self.category,
+            self.model,
+            self.payload,
+            self.reach,
+            self.weight)
+        return desc
