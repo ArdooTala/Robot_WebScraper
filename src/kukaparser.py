@@ -1,6 +1,5 @@
 import pathlib
 from io import BytesIO
-import random
 import pdfplumber
 from bs4 import BeautifulSoup
 from requests_html import HTMLSession
@@ -17,7 +16,7 @@ class KukaParser:
         self.payload = 0
         self.weight = 0
         self.footprint = (0, 0)
-        self.payload_max = 0
+        # self.payload_max = 0
         self.reach = 0
         self.construction = None
         self.mount = []
@@ -41,24 +40,43 @@ class KukaParser:
         self._datasheetdata = cat
 
     def parse_kuka_datasheet(self):
+        if not self.datasheet:
+            print("No datasheet downloaded . . . !")
+            return
         try:
             with pdfplumber.open(self.datasheet) as temp:
                 _page = temp.pages[0]
                 ds = _page.extract_text().strip()
                 model = ds.splitlines()[0]
-                w = re.search(r"Weight approx. (\d+) kg", ds, flags=re.M | re.S | re.IGNORECASE)
-                f = re.search(r"Footprint (\d+) mm x (\d+) mm", ds, flags=re.M | re.S | re.IGNORECASE)
-                m = re.search(r"Maximum payload (\d+\.?\d*) kg", ds, flags=re.M | re.S | re.IGNORECASE)
+                print("Datasheet >> {}".format(model))
+                # self.model = model
 
-                self.model = model
-                self.weight = float(w.groups()[0])
-                self.footprint = f.groups()
-                self.footprint = (float(self.footprint[0]), float(self.footprint[1]))
-                self.payload_max = float(m.groups()[0])
-        except:
+                try:
+                    w = re.search(r"Weight approx. (\d+) kg", ds, flags=re.M | re.S | re.IGNORECASE)
+                    f = re.search(r"Footprint (\d+\.?\d*) mm x (\d+\.?\d*) mm", ds, flags=re.M | re.S | re.IGNORECASE)
+                    # m = re.search(r"Maximum payload (\d+\.?\d*) kg", ds, flags=re.M | re.S | re.IGNORECASE)
+
+                    self.weight = float(w.groups()[0])
+                    self.footprint = f.groups()
+                    if self.footprint:
+                        self.footprint = (float(self.footprint[0]), float(self.footprint[1]))
+                    # self.payload_max = float(m.groups()[0])
+
+                except Exception as e:
+                    print("Extraction Failed!")
+                    print(ds)
+                    print('-'*50)
+                    print(w)
+                    print(f)
+                    # print(m)
+                    print('-' * 50)
+                    print(e)
+                    return
+
+        except Exception as e:
             print("Could not read pdf file . . .")
-            return None
-        return model, w.groups()[0], f.groups(), m.groups()[0]
+            print(e)
+            return
 
     def save_to_disk(self, path: pathlib.Path):
         if not path.exists():
